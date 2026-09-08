@@ -134,12 +134,44 @@ LLM_PROVIDER=ollama    # modelo local. Requiere `ollama serve` y el modelo desca
 LLM_PROVIDER=gemini    # Google AI Studio. Requiere GEMINI_API_KEY.
 ```
 
-Con Ollama:
+Con Ollama, **verificado de punta a punta** (`QUOTED` en 6.1 s, `NEEDS_INFO` en 5.2 s):
 
 ```bash
 ollama pull qwen2.5:3b
 LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:3b npm start
 ```
+
+### Gemini: cuatro nombres de modelo, cuatro fallos, y el sistema aguantó los cuatro
+
+Al probar el adaptador de Gemini contra la API real ocurrió algo que no planeé y que resultó
+mejor evidencia que una llamada exitosa. En una sola tarde:
+
+| modelo | resultado |
+|---|---|
+| `gemini-2.0-flash` | **404** — retirado por Google |
+| `gemini-3.6-flash` | **404** — y es el nombre que el propio mensaje de error anterior recomendaba usar |
+| `gemini-2.5-flash` | **404** — pese a aparecer en `GET /v1beta/models` como compatible con `generateContent` |
+| `gemini-flash-latest` | existe y autentica, pero **503: capa gratuita saturada** |
+
+La clave funciona: los 404 son del modelo, no de la autenticación.
+
+**Lo que importa es cómo se comportó el sistema las cuatro veces:** degradó a `NEEDS_INFO`,
+dejó el motivo exacto en `meta.warnings`, **nunca inventó un dato** y nunca devolvió un 500
+crudo. Fue una prueba de caída de proveedor externo que nadie escribió — y sobre el
+proveedor de LLM, no sobre el carrier.
+
+```jsonc
+{ "status": "NEEDS_INFO",
+  "missing_fields": ["origin","destination","weight_kg","service_type"],
+  "meta": { "llm_provider": "gemini:gemini-flash-latest",
+            "warnings": ["(extractor): el proveedor de LLM fallo: Gemini respondio 503: ..."] } }
+```
+
+**Por eso el default es el alias `gemini-flash-latest` y no un modelo fijado.** Ver caducar
+dos nombres en la misma sesión es un argumento fuerte: un identificador fijado a mano se
+pudre en silencio, y el aviso llega el día que un usuario recibe un 404. El alias tiene su
+propio costo —el modelo puede cambiar bajo tus pies— y es un intercambio consciente: aquí
+pesa más que la solución siga arrancando dentro de tres meses.
 
 Los tres usan **salida estructurada forzada** (`format` en Ollama, `responseSchema` en
 Gemini): decodificación restringida, no "responde en JSON, por favor".

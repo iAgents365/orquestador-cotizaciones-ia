@@ -15,7 +15,7 @@
     ],
     "message": "Para continuar necesito la ciudad de destino.",
     "meta": {
-      "request_id": "9df0ab90-b5f4-4b5f-ac2d-8b925b237fd9",
+      "request_id": "fb53b8e6-c59e-49ba-a37d-1557d948f7d8",
       "llm_provider": "mock:reglas-deterministas",
       "provider_attempts": 0,
       "duration_ms": 3

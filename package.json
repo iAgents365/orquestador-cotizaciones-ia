@@ -8,8 +8,8 @@
     "node": ">=18.18"
   },
   "scripts": {
-    "start": "tsx src/index.ts",
-    "evidencia": "tsx scripts/evidencia.ts",
+    "start": "node --env-file-if-exists=.env node_modules/tsx/dist/cli.mjs src/index.ts",
+    "evidencia": "node --env-file-if-exists=.env node_modules/tsx/dist/cli.mjs scripts/evidencia.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

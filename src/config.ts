@@ -34,7 +34,7 @@ const EsquemaEntorno = z.object({
   OLLAMA_BASE_URL: z.string().url().default("http://127.0.0.1:11434"),
   OLLAMA_MODEL: z.string().default("llama3.2:3b"),
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
+  GEMINI_MODEL: z.string().default("gemini-flash-latest"),
 
   PROVIDER_MAX_ATTEMPTS: entero(3, 1, 10),
   /**
