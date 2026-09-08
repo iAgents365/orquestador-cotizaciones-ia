@@ -70,6 +70,16 @@ const ATAQUES: Array<{ etiqueta: string; mensaje: string; esperado: string }> = 
     mensaje: "Enviar 5 kg de Puebla'; DROP TABLE orders;-- a Leon express" },
   { etiqueta: "XSS-ish", esperado: "no rompe, texto plano",
     mensaje: "Enviar 5 kg de <script>alert(1)</script> a Leon express" },
+  // --- el limite REAL del extractor de reglas: mercancia contra ciudad ---
+  // Es mas frecuente que cualquier ataque de esta lista: nadie escribe JSON inyectado,
+  // todo el mundo escribe "5 kg de ropa". Y NO tiene arreglo con reglas: distinguir
+  // "azucar" de "Puebla" no es estructura, es saber que una es mercancia y la otra una
+  // ciudad. Aqui es donde un LLM se gana su costo, y esta medido: con el mismo mensaje,
+  // las reglas dan origin="azucar de Puebla" y Gemini da origin="Puebla".
+  { etiqueta: "MERCANCIA como origen", esperado: "reglas fallan; el LLM acierta",
+    mensaje: "enviar 5 kg de ropa a Leon urgente" },
+  { etiqueta: "MERCANCIA y ciudad", esperado: "reglas fallan; el LLM acierta",
+    mensaje: "Quiero mandar 8 kg de azucar de Puebla a Monterrey express" },
   { etiqueta: "CIUDAD larguisima", esperado: "cota de 120 chars",
     mensaje: `Enviar 5 kg de ${"A".repeat(300)} a Leon express` },
 ];
@@ -110,6 +120,13 @@ const DEBEN_COTIZAR = new Set([
   // marcadores la rechaza. No hay SQL en este sistema, el usuario si dijo Puebla, y
   // cotizar ese envio es correcto. Se cuenta como valido para no penalizar al que entiende.
   "SQL-ish",
+  // Los dos de mercancia SI deben cotizar cuando hay un LLM detras, porque el mensaje
+  // trae todo. Con el extractor de reglas fallan, y ese fallo esta documentado en el
+  // README como el limite exacto donde un modelo se gana su costo. No se marca como
+  // "ataque conseguido" porque no es un ataque: es lenguaje normal que las reglas no
+  // alcanzan a leer.
+  "MERCANCIA como origen",
+  "MERCANCIA y ciudad",
 ]);
 
 console.log(`EQUIPO ROJO — proveedor: ${deps.extractor.detalle}\n`);

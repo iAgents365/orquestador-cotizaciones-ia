@@ -33,7 +33,7 @@ contra el servidor real y escribe las respuestas en [`evidencia/`](evidencia/REA
    resiliencia que **no** entraron, con su diseño y el motivo de cada exclusión.
 
 **Lo que está medido y no supuesto:** 72 pruebas, tres proveedores de LLM probados contra sus
-APIs reales, 20 ataques adversariales contra las tres capas, y un ensayo completo desde un
+APIs reales, 22 ataques adversariales contra las tres capas, y un ensayo completo desde un
 clon limpio del repositorio.
 
 **Lo que este sistema NO hace**, declarado por adelantado: no resiste una carga real sin
@@ -436,9 +436,9 @@ de esas comprobaciones sabe si el dato *salió del mensaje*. Anclar es lo único
 ### La misma batería contra las tres capas — y aquí está lo que más aprendí
 
 ```bash
-npx tsx scripts/adversario.ts mock      # 0 de 20
-npx tsx scripts/adversario.ts gemini    # 0 de 20
-npx tsx scripts/adversario.ts ollama    # 0 de 20  (eran 4 antes de las guardas)
+npx tsx scripts/adversario.ts mock      # 0 de 22
+npx tsx scripts/adversario.ts gemini    # 0 de 22
+npx tsx scripts/adversario.ts ollama    # 0 de 22  (eran 4 antes de las guardas)
 ```
 
 **Mismo guardrail, mismos veinte ataques, tres resultados distintos.** El guardrail es
@@ -503,6 +503,45 @@ número es invención, por plausible que se vea.
 modelo limpió la basura y extrajo la ciudad, que es lo correcto. Aquí los dos proveedores
 **discrepan y los dos son defendibles** — el extractor de reglas conserva la cadena entera y
 su guarda de marcadores la rechaza.
+
+### El límite donde un modelo se gana su costo — y está medido
+
+El caso más frecuente de todos no es ningún ataque. Es este:
+
+```
+"enviar 5 kg de ropa a Leon urgente"
+```
+
+| extractor | `origin` |
+|---|---|
+| reglas deterministas | **`"ropa"`** ❌ |
+| `gemini-flash-lite-latest` | correctamente ausente ✅ |
+
+Y con las dos cosas en el mismo mensaje:
+
+```
+"Quiero mandar 8 kg de azucar de Puebla a Monterrey express"
+```
+
+| extractor | `origin` |
+|---|---|
+| reglas deterministas | **`"azucar de Puebla"`** ❌ |
+| `gemini-flash-lite-latest` | **`"Puebla"`** ✅ |
+
+**El patrón `de X a Y` se traga la mercancía como si fuera la ciudad de origen.** Nadie
+escribe JSON inyectado; todo el mundo escribe «5 kg de ropa».
+
+**Y no tiene arreglo con reglas.** Distinguir «azúcar» de «Puebla» no es un problema de
+estructura sino de significado: haría falta la lista de todas las ciudades y todas las
+mercancías. La comprobación de anclaje tampoco ayuda — «ropa» sí aparece en el mensaje.
+
+> **Esta es la respuesta concreta a «¿cuándo hace falta un LLM aquí?».** No hace falta para
+> leer un formulario: para eso un formulario es más barato y más predecible. Hace falta
+> exactamente donde **no se puede controlar la entrada** —WhatsApp, notas de voz, mensajes
+> con faltas— y donde decidir requiere significado y no forma.
+
+El extractor de reglas se queda como default por reproducibilidad, no porque sea mejor.
+Su límite está aquí, medido y con dos casos en la batería.
 
 ### La respuesta honesta sobre inyección de prompt
 
