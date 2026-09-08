@@ -85,6 +85,17 @@ interface Capturado {
   ms: number;
 }
 
+/**
+ * El generador de evidencia calla el log de peticiones del servidor salvo que se pida lo
+ * contrario (`LOG_LEVEL=info npm run evidencia`).
+ *
+ * Por que: lo que este script produce es un ARTEFACTO PARA LEER, y una linea de log por
+ * cada peticion entrante partia las respuestas en dos. Lo que NO se calla es el rastro del
+ * carrier agotado —los tres intentos con su 504, su 429 y su espera— porque eso si es
+ * evidencia y es justo lo que hay que poder enseñar.
+ */
+process.env["LOG_LEVEL"] ??= "warn";
+
 async function correr(escenario: Escenario): Promise<Capturado> {
   const config: Config = cargarConfig({
     ...process.env,

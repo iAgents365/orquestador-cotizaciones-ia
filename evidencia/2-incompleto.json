@@ -15,10 +15,10 @@
     ],
     "message": "Para continuar necesito la ciudad de destino.",
     "meta": {
-      "request_id": "398354b5-71d9-4d9f-948b-18196e688e19",
+      "request_id": "92ef0e7b-c6e7-41a2-9a17-098eb6002fcc",
       "llm_provider": "mock:reglas-deterministas",
       "provider_attempts": 0,
-      "duration_ms": 4
+      "duration_ms": 2
     }
   }
 }
