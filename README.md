@@ -23,6 +23,17 @@ default y la solución arranca sin configurar nada.
 
 Requiere Node ≥ 18.18. Probado en Node 24.18.0, Windows 11.
 
+**Verificado desde un clon limpio** (no sólo en la máquina donde se escribió):
+
+| paso | resultado |
+|---|---|
+| `git clone` + `npm install` | 5.7 s |
+| `npm start` → `GET /health` | OK |
+| petición canónica | `QUOTED`, los cinco campos correctos |
+| `npm run evidencia` | 3 de 3 escenarios |
+| `npm test` | 62 de 62 |
+| `npx tsc --noEmit` | limpio |
+
 ### Probar a mano
 
 Los cuerpos de ejemplo están en `ejemplos/`, con acentos ya codificados en UTF-8:
@@ -141,10 +152,13 @@ ollama pull qwen2.5:3b
 LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:3b npm start
 ```
 
-### Gemini: cuatro nombres de modelo, cuatro fallos, y el sistema aguantó los cuatro
+### Gemini, verificado — y el camino para llegar ahí
 
-Al probar el adaptador de Gemini contra la API real ocurrió algo que no planeé y que resultó
-mejor evidencia que una llamada exitosa. En una sola tarde:
+**Funciona de punta a punta con `gemini-flash-lite-latest`:** `QUOTED` en 3.7 s con los cinco
+campos correctos, `NEEDS_INFO` en ~0.7 s. Se activa con `LLM_PROVIDER=gemini` y una clave en
+`.env`.
+
+Llegar ahí costó cinco intentos, y lo cuento porque el camino es la evidencia:
 
 | modelo | resultado |
 |---|---|
@@ -152,8 +166,12 @@ mejor evidencia que una llamada exitosa. En una sola tarde:
 | `gemini-3.6-flash` | **404** — y es el nombre que el propio mensaje de error anterior recomendaba usar |
 | `gemini-2.5-flash` | **404** — pese a aparecer en `GET /v1beta/models` como compatible con `generateContent` |
 | `gemini-flash-latest` | existe y autentica, pero **503: capa gratuita saturada** |
+| **`gemini-flash-lite-latest`** | **funciona**, 955 ms en una sonda directa |
 
-La clave funciona: los 404 son del modelo, no de la autenticación.
+La clave funciona: los 404 son del modelo, no de la autenticación. Y el diagnóstico no fue
+adivinar sino **preguntarle a la API qué modelos existen** (`GET /v1beta/models`) y luego
+**ejercer cada candidato con una llamada real** — porque la lista resultó no ser fiable:
+`gemini-2.5-flash` aparecía como compatible y devolvía 404.
 
 **Lo que importa es cómo se comportó el sistema las cuatro veces:** degradó a `NEEDS_INFO`,
 dejó el motivo exacto en `meta.warnings`, **nunca inventó un dato** y nunca devolvió un 500
@@ -167,11 +185,15 @@ proveedor de LLM, no sobre el carrier.
             "warnings": ["(extractor): el proveedor de LLM fallo: Gemini respondio 503: ..."] } }
 ```
 
-**Por eso el default es el alias `gemini-flash-latest` y no un modelo fijado.** Ver caducar
-dos nombres en la misma sesión es un argumento fuerte: un identificador fijado a mano se
-pudre en silencio, y el aviso llega el día que un usuario recibe un 404. El alias tiene su
-propio costo —el modelo puede cambiar bajo tus pies— y es un intercambio consciente: aquí
-pesa más que la solución siga arrancando dentro de tres meses.
+**Por eso el default es un alias (`…-latest`) y no un modelo fijado.** Ver caducar dos
+nombres en la misma tarde es argumento suficiente: un identificador fijado a mano se pudre en
+silencio, y el aviso llega el día que un usuario recibe un 404. El alias tiene su propio
+costo —el modelo puede cambiar bajo los pies— y es un intercambio consciente: aquí pesa más
+que la solución siga arrancando dentro de tres meses.
+
+**Y el 503 no se resuelve pagando.** Es saturación de un modelo concreto en la capa
+gratuita; la variante *lite* respondía sin problema al mismo tiempo. Antes de meter dinero
+conviene preguntar cuál está vivo, no cuánto cuesta.
 
 Los tres usan **salida estructurada forzada** (`format` en Ollama, `responseSchema` en
 Gemini): decodificación restringida, no "responde en JSON, por favor".
@@ -413,12 +435,15 @@ Y la pieza que casi siempre falta: **rescate de concesión vencida**. Si el work
 media tarea, sin un `claimed_at < now() - interval '10 minutes'` en la condición del
 reclamo, ese evento queda bloqueado para siempre.
 
-**2. Circuit breaker y retry budget.** Hoy cada petición reintenta hasta 3 veces sin saber
-nada de las demás. Si el proveedor lleva 30 segundos caído, los intentos 2 y 3 sólo añaden
-carga a algo que ya sabemos muerto. Un breaker que abre tras N fallos consecutivos
-devuelve `PROVIDER_UNAVAILABLE` de inmediato y deja al proveedor recuperarse; un retry
-budget global (p. ej. reintentos ≤ 10% del tráfico) impide que una degradación se convierta
-en una avalancha.
+**2. Circuit breaker, deadline propagation y retry budget *per-client*.** Los tres están
+ausentes a propósito, con su diseño, sus umbrales y el motivo de cada exclusión escritos en
+[`docs/ADR-001`](docs/ADR-001-que-no-entro-y-por-que.md).
+
+El resumen: hoy cada petición reintenta hasta 3 veces sin saber nada de las demás, así que
+bajo carga real este servicio **amplificaría** una caída ajena en lugar de contenerla. Es
+una limitación conocida, no una sorpresa. No entraron porque sus umbrales dependen de
+telemetría que aquí no existe, y añadir capacidades apagadas la víspera de una entrega es
+marcar una casilla, no construir una capacidad.
 
 **3. Aislamiento de credenciales por cliente (multi-inquilino).** Nunca un mapa de claves
 en memoria ni una variable por cliente. Cada tenant resuelve su credencial en el momento
