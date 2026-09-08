@@ -7,8 +7,17 @@ consulta un proveedor de cotizaciones inestable sin perder control operativo.
 
 ## Para quien evalúa — lo esencial en 30 segundos
 
-**La tesis:** el modelo propone, el código dispone. El LLM extrae; **no decide** si hay
-información suficiente. Esa es una regla de negocio y la aplica un validador determinista.
+**La pregunta que ordena todo el diseño:** este sistema da por hecho que **la IA va a
+fallar**. No *si* falla — *cuándo*. La pregunta no es cómo conseguir que un modelo acierte,
+sino **qué pasa con el negocio el día que no acierte.**
+
+**La respuesta:** el modelo propone, el código dispone. El LLM extrae; **no decide** si hay
+información suficiente. Eso es una regla de negocio y la aplica un validador determinista.
+
+Todo lo demás —el guardrail, el anclaje, las cotas, los reintentos, la degradación— son
+consecuencias de tomarse esa premisa en serio. Y cuando el modelo falló de verdad, quedó
+medido: [tres proveedores](#la-misma-batería-contra-las-tres-capas--y-aquí-está-lo-que-más-aprendí),
+veinte ataques cada uno, y los huecos que aparecieron en mis propias defensas.
 
 **Para verlo funcionar:** `npm install` → `npm run evidencia`. Ejecuta los tres escenarios
 contra el servidor real y escribe las respuestas en [`evidencia/`](evidencia/README.md).
@@ -126,6 +135,41 @@ cuerpo es estructurado, sin excepción ni traza.
 `meta.provider_attempts` es la pieza de observabilidad que más se usa al operar: dice si
 la respuesta salió a la primera o si el proveedor está degradándose. En `NEEDS_INFO`
 siempre vale `0`, y eso **prueba** que el guardrail cortó antes de gastar la llamada.
+
+---
+
+## ¿Qué orquesta exactamente este orquestador?
+
+Vale la pena ser preciso con la palabra, porque admite dos lecturas y sólo una es la que
+está implementada aquí.
+
+Un director de orquesta hace dos cosas distintas: **conoce la partitura** —sabe qué va
+después de qué— y **decide qué instrumento entra en cada momento.**
+
+| lo que orquesta | ¿está aquí? |
+|---|---|
+| **El flujo**: ingesta → extracción → guardrail → proveedor externo → degradación, con el corte antes de gastar la llamada y tres estados de salida excluyentes | **Sí.** Es lo que pedía el enunciado y es lo que está construido y medido. |
+| **Los modelos**: elegir en cada petición qué proveedor usar según costo, capacidad o confianza, y escalar del barato al caro cuando el barato no alcanza | **No.** El proveedor se fija con una variable de entorno al arrancar. |
+
+**Esto conoce la partitura; no reparte los instrumentos.** Prefiero decirlo antes de que se
+note, porque la palabra «orquestador» promete lo segundo.
+
+**Y el ruteo por modelo tiene un diseño, no es un hueco sin pensar.** La medición de esta
+entrega da justo la señal que haría falta: el mismo mensaje contra `qwen2.5:3b` local y
+contra Gemini produce resultados distintos, y el guardrail ya sabe *por qué* falló —cada
+anomalía queda en `meta.warnings` con su motivo. Una política razonable sería:
+
+1. Intentar con el proveedor más barato que cubra el caso (aquí, el determinista).
+2. Escalar al siguiente **sólo cuando la anomalía indique falla del modelo** —tipo inválido,
+   marcador de ausencia, valor no anclado— y **no** cuando el mensaje esté genuinamente
+   incompleto: preguntarle al usuario es más barato que llamar a un modelo caro para que
+   confirme que falta el destino.
+3. Registrar cuál resolvió cada petición, para que la elección se base en costo y acierto
+   **medidos** y no en una preferencia escrita a mano.
+
+No entró por lo mismo que los patrones del [ADR-001](docs/ADR-001-que-no-entro-y-por-que.md):
+sus umbrales dependen de telemetría que este ejercicio no tiene, y añadirlo haría la demo no
+determinista justo donde la evidencia tiene que ser reproducible.
 
 ---
 
