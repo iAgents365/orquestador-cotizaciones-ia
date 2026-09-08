@@ -48,20 +48,60 @@ const servicioNormalizado = z.preprocess((valor) => {
   return SINONIMOS_SERVICIO[clave] ?? valor.trim().toLowerCase();
 }, z.enum(TIPOS_DE_SERVICIO));
 
-/** Acepta 8 y "8" y "8.5", rechaza "ocho". Sin coercion silenciosa de basura. */
+/**
+ * Convierte texto numerico en espanol a numero, o `null` si es invalido o AMBIGUO.
+ *
+ * Lo comparten el extractor mock y la validacion, para que los dos lean igual un numero.
+ * Antes cada uno lo hacia por su lado y no coincidian.
+ *
+ * Tres rechazos que existen por fallos medidos con la bateria adversarial:
+ *
+ * - **Signo.** `"-5 kg"` producia `5`. El sistema se comia el menos y cotizaba un envio de
+ *   peso negativo como si fuera positivo.
+ * - **`"1,500"`.** Producia `1.5` — un error de factor mil en una cifra que va a una
+ *   cotizacion. En espanol la coma es separador decimal Y de miles segun el pais, asi que
+ *   el patron de miles es genuinamente ambiguo: **no se adivina, se pregunta.**
+ * - **`"1.500"`.** El mismo caso al reves.
+ *
+ * Adivinar cual de los dos quiso decir el usuario seria justo el supuesto silencioso que
+ * este sistema existe para impedir. Devolver `null` manda el campo a `NEEDS_INFO`.
+ */
+export function parsearNumero(texto: string): number | null {
+  const limpio = texto.trim();
+  if (limpio === "") return null;
+  if (/^[+-]/u.test(limpio)) return null;
+  if (/^\d{1,3}(,\d{3})+$/u.test(limpio)) return null;
+  if (/^\d{1,3}(\.\d{3})+$/u.test(limpio)) return null;
+  const conPunto = limpio.replace(",", ".");
+  if (!/^\d+(\.\d+)?$/u.test(conPunto)) return null;
+  const numero = Number(conPunto);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+/**
+ * COTAS DE NEGOCIO, no de tipo.
+ *
+ * `99999999 kg` y `999999 paquetes` pasaban la validacion: eran numeros positivos y el
+ * esquema solo comprobaba el tipo. Un guardrail que valida la FORMA y no el SIGNIFICADO
+ * deja cotizar cien millones de kilos, que es exactamente el ridiculo que este sistema
+ * dice evitar.
+ *
+ * Los topes son deliberados y discutibles —30 t es un trailer completo, 1000 bultos es un
+ * embarque grande— y por eso estan aqui arriba, con nombre, en vez de escondidos.
+ */
+export const PESO_MAXIMO_KG = 30_000;
+export const BULTOS_MAXIMOS = 1_000;
+
+/** Acepta 8, "8" y "8.5"; rechaza "ocho", "-5" y "1,500". */
 const numeroPositivo = z.preprocess((valor) => {
   if (typeof valor !== "string") return valor;
-  const limpio = valor.trim().replace(",", ".");
-  if (limpio === "" || !/^\d+(\.\d+)?$/.test(limpio)) return valor;
-  return Number(limpio);
-}, z.number().positive().finite());
+  return parsearNumero(valor) ?? Number.NaN;
+}, z.number().positive().finite().max(PESO_MAXIMO_KG, `el peso no puede superar ${PESO_MAXIMO_KG} kg`));
 
 const enteroPositivo = z.preprocess((valor) => {
   if (typeof valor !== "string") return valor;
-  const limpio = valor.trim();
-  if (limpio === "" || !/^\d+$/.test(limpio)) return valor;
-  return Number(limpio);
-}, z.number().int().positive());
+  return parsearNumero(valor) ?? Number.NaN;
+}, z.number().int().positive().max(BULTOS_MAXIMOS, `no se pueden cotizar mas de ${BULTOS_MAXIMOS} bultos`));
 
 /**
  * MARCADORES DE AUSENCIA — una guarda que existe por un fallo medido, no por precaucion.
@@ -135,6 +175,15 @@ export interface DefinicionCampo {
   descripcion: string;
   /** Frase humana para el mensaje de NEEDS_INFO. */
   faltante: string;
+  /**
+   * Si es `true`, el valor extraido tiene que APARECER en el mensaje del usuario. Si no
+   * aparece, no se cotiza con el: se trata como ausente y se pregunta.
+   *
+   * Solo para texto libre. Los campos de enum (como `service_type`) no se anclan porque su
+   * valor canonico es una traduccion legitima —"exprés" se convierte en "express"— y los
+   * numeros tampoco, porque "8 kg" puede llegar convertido desde gramos o libras.
+   */
+  anclado?: boolean;
 }
 
 export const CAMPOS = {
@@ -142,6 +191,7 @@ export const CAMPOS = {
     esquema: ciudad,
     tipoJson: "string",
     obligatorio: true,
+    anclado: true,
     descripcion: "Ciudad o lugar de origen del envio, tal como la escribio el usuario.",
     faltante: "la ciudad de origen",
   },
@@ -149,6 +199,7 @@ export const CAMPOS = {
     esquema: ciudad,
     tipoJson: "string",
     obligatorio: true,
+    anclado: true,
     descripcion: "Ciudad o lugar de destino del envio, tal como la escribio el usuario.",
     faltante: "la ciudad de destino",
   },

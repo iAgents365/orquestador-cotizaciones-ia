@@ -11,6 +11,8 @@
  *                           estructurado, sin stack ni detalle interno.
  *   Peticion mal formada -> 400 con los campos que fallaron.
  */
+import { randomUUID, timingSafeEqual } from "node:crypto";
+
 import Fastify, { type FastifyInstance } from "fastify";
 
 import type { Config } from "./config.ts";
@@ -32,12 +34,22 @@ import { EsquemaPeticionEntrante } from "./schema.ts";
  * —claim/complete/busy con rescate de concesion vencida en base de datos— se explica en
  * el README, en "Que dejaria listo para produccion".
  */
+/** Tope y caducidad del almacen. Sin ellos, el mapa crece sin limite: eso es un DoS. */
+const IDEMPOTENCIA_MAX_ENTRADAS = 5_000;
+const IDEMPOTENCIA_TTL_MS = 30 * 60 * 1000;
+const IDEMPOTENCIA_CLAVE_MAX = 200;
+
 class AlmacenIdempotencia {
   private readonly enCurso = new Map<string, Promise<RespuestaOrquestador>>();
-  private readonly hechas = new Map<string, RespuestaOrquestador>();
+  private readonly hechas = new Map<string, { valor: RespuestaOrquestador; expira: number }>();
 
   obtener(clave: string): Promise<RespuestaOrquestador> | RespuestaOrquestador | undefined {
-    return this.hechas.get(clave) ?? this.enCurso.get(clave);
+    const hecha = this.hechas.get(clave);
+    if (hecha) {
+      if (hecha.expira > Date.now()) return hecha.valor;
+      this.hechas.delete(clave);
+    }
+    return this.enCurso.get(clave);
   }
 
   async registrar(
@@ -49,10 +61,31 @@ class AlmacenIdempotencia {
       const resultado = await trabajo;
       // Solo se memoriza lo definitivo: un fallo transitorio del proveedor no debe
       // quedar congelado como respuesta para siempre.
-      if (resultado.status !== "PROVIDER_UNAVAILABLE") this.hechas.set(clave, resultado);
+      if (resultado.status !== "PROVIDER_UNAVAILABLE") {
+        this.podar();
+        this.hechas.set(clave, { valor: resultado, expira: Date.now() + IDEMPOTENCIA_TTL_MS });
+      }
       return resultado;
     } finally {
       this.enCurso.delete(clave);
+    }
+  }
+
+  /**
+   * Sin poda, mil peticiones con mil claves distintas dejan mil respuestas en memoria para
+   * siempre. Eso no es una limitacion del prototipo: es una forma de tumbar el proceso
+   * mandando claves unicas. `Map` conserva el orden de insercion, asi que la primera del
+   * iterador es la mas vieja.
+   */
+  private podar(): void {
+    const ahora = Date.now();
+    for (const [clave, entrada] of this.hechas) {
+      if (entrada.expira <= ahora) this.hechas.delete(clave);
+    }
+    while (this.hechas.size >= IDEMPOTENCIA_MAX_ENTRADAS) {
+      const masVieja = this.hechas.keys().next();
+      if (masVieja.done) break;
+      this.hechas.delete(masVieja.value);
     }
   }
 }
@@ -64,6 +97,18 @@ export function construirServidor(config: Config): FastifyInstance {
   const extractor = crearExtractor(config.llm);
   const idempotencia = new AlmacenIdempotencia();
 
+  /**
+   * El mock del carrier simula un proveedor EXTERNO, asi que no puede quedar abierto al
+   * mundo: cualquiera podria dispararlo y consumir el proceso. Se cierra con un secreto
+   * generado al arrancar, que solo conoce el cliente de este mismo proceso.
+   *
+   * Se genera en vez de configurarse a proposito: asi la solucion sigue corriendo con tres
+   * comandos y sin `.env`, y aun asi la ruta no queda publica. Un secreto que hay que
+   * configurar a mano habria terminado con un valor por defecto en el repositorio, que es
+   * como no tener secreto.
+   */
+  const secretoInterno = randomUUID();
+
   // La URL del carrier se resuelve EN CADA LLAMADA, no al construir: asi el servidor
   // funciona igual en un puerto fijo que en uno efimero (`port: 0`), que es lo que usa
   // el generador de evidencia para no chocar con una instancia ya levantada.
@@ -72,10 +117,23 @@ export function construirServidor(config: Config): FastifyInstance {
     const puerto = typeof direccion === "object" && direccion ? direccion.port : config.port;
     return `http://127.0.0.1:${puerto}/mock-carrier/quote`;
   };
-  const cliente = crearClienteCotizacion({ urlCarrier, politica: config.reintentos });
+  const cliente = crearClienteCotizacion({
+    urlCarrier,
+    politica: config.reintentos,
+    tokenInterno: secretoInterno,
+  });
 
   // --- El proveedor externo inestable ---------------------------------------------
   app.post("/mock-carrier/quote", async (peticion, respuesta) => {
+    // Falla CERRADO: sin la cabecera correcta no se atiende. Comparacion en tiempo
+    // constante para no filtrar el secreto por el tiempo de respuesta.
+    const presentado = peticion.headers["x-internal-token"];
+    const esperado = Buffer.from(secretoInterno);
+    const recibido = Buffer.from(typeof presentado === "string" ? presentado : "");
+    if (recibido.length !== esperado.length || !timingSafeEqual(recibido, esperado)) {
+      return await respuesta.status(404).send({ error: "not found" });
+    }
+
     const cuerpo = peticion.body as PeticionCarrier;
     const controlador = new AbortController();
 

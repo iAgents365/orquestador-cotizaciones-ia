@@ -18,7 +18,7 @@ npm start           # servidor en http://127.0.0.1:3000
 npm run evidencia   # ejecuta los 3 escenarios y escribe evidencia/
 ```
 
-`npm test` corre 34 pruebas unitarias. No hace falta `.env`: todos los valores tienen
+`npm test` corre 62 pruebas unitarias. No hace falta `.env`: todos los valores tienen
 default y la solución arranca sin configurar nada.
 
 Requiere Node ≥ 18.18. Probado en Node 24.18.0, Windows 11.
@@ -256,7 +256,68 @@ ausencia. Por eso los campos de texto libre rechazan además marcadores de ausen
 (`(...)`, `N/A`, `desconocido`, `no especificado`, `null`, `???`…), con pruebas que
 comprueban que ninguna ciudad mexicana real cae en la trampa.
 
-### 5. La elección del modelo local es una decisión, no un detalle de instalación
+### 5. Equipo rojo contra mi propia solución
+
+Antes de entregar corrí una batería adversarial contra el guardrail, partiendo de que quien
+evalúa va a intentar romperla:
+
+```bash
+npx tsx scripts/adversario.ts
+```
+
+Veinte mensajes hostiles o raros: inyección de prompt, negación, números con trampa, frases
+invertidas, emoji suelto, SQL y HTML dentro de un nombre de ciudad. **Encontró siete
+defectos que ninguna de las pruebas veía**, porque las pruebas comprobaban lo que yo ya
+había pensado:
+
+| entrada | daba | ahora |
+|---|---|---|
+| `"-5 kg"` | `weight_kg: 5` — se comía el signo | `NEEDS_INFO` |
+| `"1,500 kg"` | `1.5` — error de factor mil | `NEEDS_INFO` (ambiguo, se pregunta) |
+| `"NO urgente, que sea normal"` | `express` — lo contrario de lo pedido | `standard` |
+| `"de Puebla a Leon express"` | `destination: "Leon express"` | `destination: "Leon"` |
+| `"de Puebla, no se todavia a donde"` | cotizaba a una ciudad llamada `"donde"` | `NEEDS_INFO` |
+| `"99999999 kg"` / `"999999 paquetes"` | aceptados | rechazados por cota de negocio |
+| `"A Monterrey mandar desde CDMX"` | destino con media frase dentro | `NEEDS_INFO` |
+
+De ahí salieron tres guardas nuevas, y la tercera es la que más me importa:
+
+**a) Cotas de negocio, no sólo de tipo.** `99,999,999 kg` era un número positivo válido y
+pasaba. Un guardrail que valida la forma y no el significado deja cotizar cien millones de
+kilos. Los topes (30 t, 1000 bultos) son discutibles y por eso están arriba del archivo, con
+nombre, en vez de escondidos.
+
+**b) Un default es para la ausencia, no para el rechazo.** `"999999 paquetes"` se rechazaba
+por la cota y *después* el default ponía `package_count: 1` y el sistema **cotizaba**. El
+usuario pidió algo y se le entregaba otra cosa sin avisar — justo el supuesto silencioso que
+todo esto existe para impedir. Ahora un campo que vino pero no es válido **pregunta**.
+
+**c) Comprobación de anclaje — la defensa contra la inyección de prompt.** Un campo de texto
+sólo se acepta si **aparece en el mensaje del usuario**. El guardrail comprueba forma —que
+sea texto, que mida entre 2 y 120 caracteres, que no sea un marcador de ausencia— y ninguna
+de esas comprobaciones sabe si el dato *salió del mensaje*. Anclar es lo único que distingue
+**extraído** de **inventado**.
+
+> **Cuesta algo, y es un intercambio consciente:** un modelo bueno que normaliza «CDMX» a
+> «Ciudad de México» falla el anclaje y su respuesta se descarta. Se acepta ese costo porque
+> el fallo cae del lado seguro: en vez de cotizar sobre un dato no verificable, se le
+> pregunta al usuario.
+
+**La respuesta honesta sobre inyección de prompt**, porque la van a preguntar: no garantizo
+que el modelo ignore una inyección. Trato su salida como entrada hostil. El modelo propone y
+código determinista autoriza — y ese código exige que el valor tenga respaldo en el mensaje.
+
+**Dos superficies que también se cerraron**, y no eran limitaciones sino fallos:
+
+- **`POST /mock-carrier/quote` era pública.** Ahora exige un secreto generado al arrancar,
+  comparado en tiempo constante, y sin él responde 404. Se genera en vez de configurarse
+  para que la solución siga corriendo sin `.env` — un secreto que hay que poner a mano habría
+  terminado con un valor por defecto en el repositorio, que es como no tener secreto.
+- **El almacén de idempotencia crecía sin límite.** Mil claves distintas dejaban mil
+  respuestas en memoria para siempre; eso es una forma de tumbar el proceso. Ahora tiene tope
+  y caducidad.
+
+### 6. La elección del modelo local es una decisión, no un detalle de instalación
 
 `scripts/comparar-modelos.ts` la convierte en una medición repetible: cuatro mensajes,
 campo a campo, contra los modelos que se le pasen. **Omitir un campo ausente cuenta como
@@ -358,9 +419,10 @@ src/
   server.ts                      rutas HTTP + el mock del carrier
   llm/{index,mock,ollama,gemini}.ts
   provider/{cliente-resiliente,cliente-cotizacion,carrier-mock,normalizar}.ts
-test/                            34 pruebas, sin esperas reales
+test/                            62 pruebas, sin esperas reales
 scripts/
   evidencia.ts                   genera evidencia/ ejecutando los 3 escenarios
   comparar-modelos.ts            mide modelos locales campo a campo
+  adversario.ts                  bateria de equipo rojo contra el guardrail
 evidencia/                       salida real, nada escrito a mano
 ```

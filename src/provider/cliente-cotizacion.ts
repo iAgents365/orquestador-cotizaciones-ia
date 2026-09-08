@@ -30,6 +30,12 @@ export interface OpcionesCliente {
   urlCarrier: string | (() => string);
   politica: PoliticaReintentos;
   resiliencia?: DependenciasResiliencia;
+  /**
+   * Secreto compartido con el mock del carrier del mismo proceso. Un carrier real usaria
+   * su propia credencial, resuelta por peticion; aqui basta con que la ruta no quede
+   * abierta a cualquiera.
+   */
+  tokenInterno?: string;
 }
 
 /**
@@ -51,7 +57,10 @@ export function crearClienteCotizacion(opciones: OpcionesCliente): ClienteCotiza
           try {
             respuesta = await fetch(destino, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                ...(opciones.tokenInterno ? { "x-internal-token": opciones.tokenInterno } : {}),
+              },
               body: JSON.stringify(peticion),
               signal: señal,
             });
