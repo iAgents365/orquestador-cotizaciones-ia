@@ -3,6 +3,36 @@
 Recibe una petición en lenguaje natural, extrae datos estructurados con ayuda de un LLM y
 consulta un proveedor de cotizaciones inestable sin perder control operativo.
 
+---
+
+## Para quien evalúa — lo esencial en 30 segundos
+
+**La tesis:** el modelo propone, el código dispone. El LLM extrae; **no decide** si hay
+información suficiente. Esa es una regla de negocio y la aplica un validador determinista.
+
+**Para verlo funcionar:** `npm install` → `npm run evidencia`. Ejecuta los tres escenarios
+contra el servidor real y escribe las respuestas en [`evidencia/`](evidencia/README.md).
+
+**Dónde está el criterio, si sólo hay tiempo para tres cosas:**
+
+1. [`src/schema.ts`](src/schema.ts) — fuente única del modelo de datos. Agregar un campo es
+   **una** entrada; de ahí se derivan tipos, validación, prompt y `missing_fields`.
+2. [Decisiones de criterio](#decisiones-de-criterio) — por qué el default es un mock, cómo se
+   resuelve la contradicción de `package_count` del enunciado, y qué encontró la batería
+   adversarial que corrí contra mi propio guardrail.
+3. [`docs/ADR-001`](docs/ADR-001-que-no-entro-y-por-que.md) — los tres patrones de
+   resiliencia que **no** entraron, con su diseño y el motivo de cada exclusión.
+
+**Lo que está medido y no supuesto:** 62 pruebas, tres proveedores de LLM probados contra sus
+APIs reales, 20 ataques adversariales contra las tres capas, y un ensayo completo desde un
+clon limpio del repositorio.
+
+**Lo que este sistema NO hace**, declarado: no resiste una carga real sin circuit breaker
+(ADR-001), su idempotencia vive en memoria y no coordina réplicas, y el anclaje sube el costo
+de una inyección de prompt sin eliminarla — con la medición que lo demuestra.
+
+---
+
 **Proveedor de LLM usado: `mock` por defecto (extractor determinista, sin red ni claves).
 Incluye adaptadores reales de `ollama` y `gemini` detrás de la misma interfaz, y ambos se
 activan con una variable de entorno.** El porqué de ese default está en
