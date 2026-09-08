@@ -21,7 +21,7 @@ Configuracion del escenario: `CARRIER_FAILURE_RATE=0 CARRIER_MIN_LATENCY_MS=1000
 }
 ```
 
-**Respuesta** — HTTP 200, 2666 ms
+**Respuesta** — HTTP 200, 2699 ms
 
 ```json
 {
@@ -46,10 +46,10 @@ Configuracion del escenario: `CARRIER_FAILURE_RATE=0 CARRIER_MIN_LATENCY_MS=1000
     }
   ],
   "meta": {
-    "request_id": "3dfdae6c-c597-405c-993c-85fdefefb0ee",
+    "request_id": "43b6745c-0385-458e-99b2-6cf698e420b1",
     "llm_provider": "mock:reglas-deterministas",
     "provider_attempts": 1,
-    "duration_ms": 2598
+    "duration_ms": 2618
   }
 }
 ```
@@ -70,7 +70,7 @@ Configuracion del escenario: `CARRIER_FAILURE_RATE=0`
 }
 ```
 
-**Respuesta** — HTTP 200, 16 ms
+**Respuesta** — HTTP 200, 19 ms
 
 ```json
 {
@@ -80,7 +80,7 @@ Configuracion del escenario: `CARRIER_FAILURE_RATE=0`
   ],
   "message": "Para continuar necesito la ciudad de destino.",
   "meta": {
-    "request_id": "11b8418e-c77d-448e-8f62-9b8af52a3fe3",
+    "request_id": "b909248d-d297-4a44-bc60-dbc4db6e956b",
     "llm_provider": "mock:reglas-deterministas",
     "provider_attempts": 0,
     "duration_ms": 3
@@ -104,17 +104,17 @@ Configuracion del escenario: `CARRIER_FAILURE_RATE=1 CARRIER_MIN_LATENCY_MS=50 C
 }
 ```
 
-**Respuesta** — HTTP 503, 1510 ms
+**Respuesta** — HTTP 503, 1552 ms
 
 ```json
 {
   "status": "PROVIDER_UNAVAILABLE",
   "message": "No pudimos obtener la cotizacion en este momento. Intenta nuevamente en unos minutos.",
   "meta": {
-    "request_id": "55597754-3b48-45af-b7eb-e4cd234ef1a0",
+    "request_id": "e840369f-3480-4e22-8ae0-c438133f4a2a",
     "llm_provider": "mock:reglas-deterministas",
     "provider_attempts": 3,
-    "duration_ms": 1500
+    "duration_ms": 1543
   }
 }
 ```

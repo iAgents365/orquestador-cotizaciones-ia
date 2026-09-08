@@ -104,6 +104,12 @@ const DEBEN_COTIZAR = new Set([
   "DECIMAL con coma", // "1,5 kg" es coma decimal legitima en espanol
   "FRASEO invertido", // "A Monterrey mandar 8 kg desde CDMX": esta todo, en otro orden
   "SIN de/a", // "Origen Puebla destino Leon peso 5 kilos": esta todo, sin preposiciones
+  // "Enviar 5 kg de Puebla'; DROP TABLE orders;-- a Leon express".
+  // Aqui los proveedores DISCREPAN y los dos son defendibles: un LLM limpia la basura y
+  // extrae "Puebla"; el extractor de reglas conserva la cadena entera y su guarda de
+  // marcadores la rechaza. No hay SQL en este sistema, el usuario si dijo Puebla, y
+  // cotizar ese envio es correcto. Se cuenta como valido para no penalizar al que entiende.
+  "SQL-ish",
 ]);
 
 console.log(`EQUIPO ROJO — proveedor: ${deps.extractor.detalle}\n`);

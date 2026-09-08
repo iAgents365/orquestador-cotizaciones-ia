@@ -16,10 +16,10 @@
     "status": "PROVIDER_UNAVAILABLE",
     "message": "No pudimos obtener la cotizacion en este momento. Intenta nuevamente en unos minutos.",
     "meta": {
-      "request_id": "55597754-3b48-45af-b7eb-e4cd234ef1a0",
+      "request_id": "e840369f-3480-4e22-8ae0-c438133f4a2a",
       "llm_provider": "mock:reglas-deterministas",
       "provider_attempts": 3,
-      "duration_ms": 1500
+      "duration_ms": 1543
     }
   }
 }
