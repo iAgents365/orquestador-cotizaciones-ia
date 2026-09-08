@@ -17,7 +17,7 @@ información suficiente. Eso es una regla de negocio y la aplica un validador de
 Todo lo demás —el guardrail, el anclaje, las cotas, los reintentos, la degradación— son
 consecuencias de tomarse esa premisa en serio. Y cuando el modelo falló de verdad, quedó
 medido: [tres proveedores](#la-misma-batería-contra-las-tres-capas--y-aquí-está-lo-que-más-aprendí),
-veinte ataques cada uno, y los huecos que aparecieron en mis propias defensas.
+veintidós ataques cada uno, y los huecos que aparecieron en mis propias defensas.
 
 **Para verlo funcionar:** `npm install` → `npm run evidencia`. Ejecuta los tres escenarios
 contra el servidor real y escribe las respuestas en [`evidencia/`](evidencia/README.md).
@@ -39,7 +39,7 @@ clon limpio del repositorio.
 **Lo que este sistema NO hace**, declarado por adelantado: no resiste una carga real sin
 circuit breaker ([ADR-001](docs/ADR-001-que-no-entro-y-por-que.md)), su idempotencia vive en
 memoria y no coordina réplicas, y sus tres capas contra inyección de prompt **dejaron la
-batería en 0 de 20 hoy contra estos ataques — lo cual no es una promesa sobre los que no se
+batería en 0 de 22 hoy contra estos ataques — lo cual no es una promesa sobre los que no se
 me ocurrieron.**
 
 ---
@@ -441,16 +441,14 @@ npx tsx scripts/adversario.ts gemini    # 0 de 22
 npx tsx scripts/adversario.ts ollama    # 0 de 22  (eran 4 antes de las guardas)
 ```
 
-**Mismo guardrail, mismos veinte ataques, tres resultados distintos.** El guardrail es
+**Mismo guardrail, los mismos ataques, tres resultados distintos.** El guardrail es
 necesario y no es suficiente: qué modelo esté detrás cambia el resultado.
-
-Los cuatro que pasaron con `qwen2.5:3b` local, y cada uno enseña algo distinto:
 
 **Cuatro pasaron con `qwen2.5:3b`.** Tres eran huecos de mis propias guardas, y los tres se
 cerraron. La secuencia completa, porque el camino importa más que el número final:
 
 ```
-primera pasada   4 de 20    ← el anclaje de texto y las cotas no alcanzaban
+primera pasada   4 de 20    ← el anclaje de texto y las cotas no alcanzaban (la bateria tenia 20 casos)
 segunda pasada   2 de 20    ← anclaje numérico
 tercera pasada   0 de 20    ← neutralización de carga útil
 ```

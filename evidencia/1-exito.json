@@ -32,10 +32,10 @@
       }
     ],
     "meta": {
-      "request_id": "76d250b5-94f0-4b58-9db6-a61c8d3f99af",
+      "request_id": "cd9a52b8-495b-4b4a-8a1f-bf47c1396e13",
       "llm_provider": "mock:reglas-deterministas",
       "provider_attempts": 1,
-      "duration_ms": 2612
+      "duration_ms": 2601
     }
   }
 }
