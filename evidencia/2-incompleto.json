@@ -1,0 +1,24 @@
+{
+  "peticion": {
+    "user_id": "candidate-001",
+    "channel": "webchat",
+    "message_text": "Necesito enviar 8 kg desde Ciudad de México por servicio exprés"
+  },
+  "entorno": {
+    "CARRIER_FAILURE_RATE": "0"
+  },
+  "http_status": 200,
+  "respuesta": {
+    "status": "NEEDS_INFO",
+    "missing_fields": [
+      "destination"
+    ],
+    "message": "Para continuar necesito la ciudad de destino.",
+    "meta": {
+      "request_id": "6d81cf6e-5feb-4af5-9e31-faeadda7b42e",
+      "llm_provider": "mock:reglas-deterministas",
+      "provider_attempts": 0,
+      "duration_ms": 3
+    }
+  }
+}

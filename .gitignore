@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+dist/
+
+# evidencia/ SI se versiona: es entregable. Se regenera con `npm run evidencia`.

@@ -1,0 +1,25 @@
+{
+  "peticion": {
+    "user_id": "candidate-001",
+    "channel": "webchat",
+    "message_text": "Necesito enviar 8 kg de Ciudad de México a Monterrey por servicio exprés"
+  },
+  "entorno": {
+    "CARRIER_FAILURE_RATE": "1",
+    "CARRIER_MIN_LATENCY_MS": "50",
+    "CARRIER_MAX_LATENCY_MS": "150",
+    "PROVIDER_TIMEOUT_MS": "1000",
+    "PROVIDER_TOTAL_BUDGET_MS": "8000"
+  },
+  "http_status": 503,
+  "respuesta": {
+    "status": "PROVIDER_UNAVAILABLE",
+    "message": "No pudimos obtener la cotizacion en este momento. Intenta nuevamente en unos minutos.",
+    "meta": {
+      "request_id": "085eab2d-da0f-4b9c-8aa0-3c4349e405ee",
+      "llm_provider": "mock:reglas-deterministas",
+      "provider_attempts": 3,
+      "duration_ms": 1543
+    }
+  }
+}
