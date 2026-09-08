@@ -19,7 +19,18 @@ const EsquemaEntorno = z.object({
   HOST: z.string().default("127.0.0.1"),
 
   LLM_PROVIDER: z.enum(["mock", "ollama", "gemini"]).default("mock"),
-  LLM_TIMEOUT_MS: entero(8000, 100, 120000),
+  /**
+   * 30 s. Parece generoso y lo es a proposito: lo dicta el proveedor mas lento, que es
+   * un modelo local en CPU. Medido en este equipo (Ryzen 5 PRO 4650U, sin aceleracion),
+   * una extraccion con qwen2.5:3b tarda ~9 s. Con el default anterior de 8000 ms, el
+   * timeout abortaba SIEMPRE la ruta de Ollama.
+   *
+   * La degradacion se comporto bien —cayo a NEEDS_INFO avisando del fallo, sin inventar
+   * datos— pero un timeout que nunca deja terminar al proveedor no protege: lo inutiliza.
+   * Con `mock` el valor es irrelevante (respuesta inmediata) y con Gemini conviene bajarlo
+   * a 5000-8000, porque ahi 30 s de espera si son una anomalia real.
+   */
+  LLM_TIMEOUT_MS: entero(30000, 100, 120000),
   OLLAMA_BASE_URL: z.string().url().default("http://127.0.0.1:11434"),
   OLLAMA_MODEL: z.string().default("llama3.2:3b"),
   GEMINI_API_KEY: z.string().optional(),
